@@ -1,0 +1,268 @@
+#!/bin/bash
+
+# Author: Nick Stokoe, November 2018
+#
+# Adapted from:
+# http://bikulov.org/blog/2013/10/12/hybrid-symmetric-asymmetric-encryption-for-large-files/
+#
+# SYNOPSYS
+#
+# Encrypts/decrypts stdin to stdout. See usage function below for
+# options and parameters.
+#
+# AIMS
+#
+# This script aims to be useful for encrypting/decrypting large backup
+# files in an automated backup system for servers. Such a system
+# typically needs to encrypt large files, but any keys deployed to the
+# server for this are at risk of being captured.
+#
+# Public key (asymmetric) encryption would seem ideal for this, since
+# the encryption key on the server will be a different one to the
+# decryption key stored elsewhere. However it is slow and not really
+# suitable for encrypting large amounts of data. Whereas, symmetric
+# encryption is fast but uses the same key for encryption and
+# decryption.
+#
+# "Hybrid encryption" is a combination of public key encryption and
+# symmetric encryption.  A public key is used to encrypt a one-time
+# password, which is then used to encrypt the payload. The encrypted
+# one-time password is stored with the encrypted payload.  Decryption
+# is done in reverse: the one-time key is decrypted first with the
+# private decryption key, and then used to decrypt the payload.
+#
+# Ideally this would be performed by an off-the-shelf tool like GPG or
+# openssl.  However, GPG tends not to be helpful for batch
+# encryption/decryption, and key management is complex. We want to
+# avoid needing to create a keyring (which is tied to a user
+# directory) import keys, mark them trusted etc.
+#
+# OpenSSL is much simpler to use in this context, as it has no keyring
+# to manage. But at the time of writing, it does not support anything
+# suitable for encrypting large files or streams. It supports SMIME,
+# which nominally would achieve this, but current versions cannot
+# decrypt in stream mode, and so despite being able to encrupt a file
+# larger than about 2.5GB, you will not be able to decrypt it with
+# openssl.
+#
+# Therefore this script was written to implement hybrid encryption of
+# large files using openssl.
+#
+# Below, the encrypt function uses openssl to generate a
+# cryptographically secure random number as a one-time password
+# (genonetime).
+#
+# This is then encrypted with a public key (rsaencrypt), and sent
+# encoded in base64 as the first line of the encrypted stream to
+# stdout, followed by the encrypted payload read from stdin.
+#
+# The decrypt function first reads a line from stdin to get the
+# one-time password, decodes and decrypts it (rsadecrypt), then
+# decrypts the remainder of the input stream to stdout using it.
+#
+# REQUIREMENTS
+#
+# - bash
+# - openssl
+# - base64 (From the coreutils package on Debian/RedHat)
+#
+# (Note: the base64 command is used in preference to openssl's base64
+# encoding as it can be coerced to write on a single line.)
+#
+# BUGS / CONTRIBUTIONS
+#
+# https://github.com/wu-lee/hencrypt
+#
+
+set -o pipefail
+
+# Defaults
+
+RSAKEYSIZE=4096
+ONETIMEKEYSIZE=256
+OPENSSL=/usr/bin/openssl
+BASE64=/usr/bin/base64
+CYPHEROPT=-aes-256-cbc
+
+# Write to stderr
+function warn() {
+    echo "$*" >&2
+}
+
+# Exit with a nonzero code, printing the arguments on stderr
+function die() {
+    warn "exiting: $*" >&2
+    exit 1
+}
+
+# Generates an ASCII-armoured RSA keypair to stdout
+function genkeys() {
+    local keyfile=${1?You must supply a key filename}
+    warn "Writing keypair to $keyfile:"
+    "$OPENSSL" genrsa "$RSAKEYSIZE"  >$keyfile
+    warn "Copying public key to $keyfile.pub:"
+    "$OPENSSL" rsa -pubout <$keyfile >$keyfile.pub
+}
+
+# Generates a random key, in base64.
+# Output is on stdout and should be on one line to work correctly.
+function genonetime() {
+    "$OPENSSL" rand  "$ONETIMEKEYSIZE" | "$BASE64" -w0
+}
+
+# rsaencrypt $pubkeyfile
+#
+# RSA encrypts a base64 encoded stream to a base64 stream on stdout,
+# using the public keyfile given.
+#
+# Output should just be one line to work correctly.
+function rsaencrypt() {
+    local pubkeyfile=${1?You must supply a public key file}
+    "$BASE64" -d | "$OPENSSL" rsautl -encrypt -pubin -inkey "$pubkeyfile" | "$BASE64" -w0
+}
+
+# rsadecrypt $privkeyfile
+#
+# RSA decrypts a base64 encoded stream to a base64 stream on stdout,
+# using the private keyfile given.
+#
+# Output should just be one line to work correctly.
+function rsadecrypt() {
+    local privkeyfile=${1?You must supply a private key file}
+    "$BASE64" -d | "$OPENSSL" rsautl -decrypt -inkey "$privkeyfile" | "$BASE64" -w0
+}
+
+# encrypt $keyfile - Hybrid-encrypts stdin to stdout.
+#
+# A one-time key is generated, encrypted using the public RSA key,
+# and then written out base64-encoded as the first line.
+# Then the standard input is encrypted as the rest of the stream, in binary format.
+function encrypt() {
+    local pubkeyfile=${1?You must supply a public key file}
+    [ -f "$pubkeyfile" ] || die "No such file: $pubkeyfile"
+
+    # Generate a random one-time key for symmetric encryption
+    local onetimekey=$(genonetime)
+
+    # Encrypt it with asymmetric RSA encryption.
+    # Use a herestring to avoid putting onetimekey in a file or the arglist
+    # However, we don't care so much once it is encrypted.
+    local eonetimekey=$(rsaencrypt "$pubkeyfile" <<<"$onetimekey")
+    
+    # Print the encrypted key first
+    cat <<<"$eonetimekey"
+
+    # Encrypt stdin -> stdout using our one-time key, which is read from stderr
+    # (actually openssl treats it as a password, so we can use base64)
+    "$OPENSSL" enc $CYPHEROPT -salt -pass fd:2 2<<<"$onetimekey"
+}
+
+# decrypt $keyfile -  Hybrid-decrypts stdin to stdout.
+#
+# The first line is expected to be a
+# base64 encoded, RSA encrypted symmetric cypher key.  This is read,
+# decrypted using the private key file supplied, used to decrypt the rest of the
+# binary stream on stdin.
+function decrypt() {
+    local privkeyfile=${1?You must supply a private key file}
+    [ -f "$privkeyfile" ] || die "No such file: $privkeyfile"
+
+    # Read our RSA encrypted base64 encoded one time key from the
+    # first line of stdin.
+    local eonetimekey
+    read -r eonetimekey
+
+    # Decrypt it.  Use a herestring/read to avoid putting onetimekey
+    # in a file or the arglist.  Process substitution (< <) is required to
+    # as read doesn't work with pipes
+    local onetimekey
+    read -r onetimekey < <(rsadecrypt "$privkeyfile" <<<"$eonetimekey")
+
+    # Decrypt the rest of the stream with it
+    # (actually openssl treats it as a password, so we can use base64)
+    "$OPENSSL" enc -d $CYPHEROPT -pass fd:2 2<<<"$onetimekey" || die "failed to decrypt"
+}
+
+
+# Just prints usage to stderr
+usage() {
+  command=`basename $0`
+  cat >&2 <<USAGE;
+
+$command: a utility for hybrid-encryption of potentially large streams or files.
+
+Usage:
+
+
+ $command -h 
+
+Prints this usage.
+
+
+ $command [opts] -g <keyfile>
+
+Generates a new RSA keypair in <keyfile> and copies the public portion
+to <keyfile>.pub. Use the former for decryption, and the latter for
+encryption.
+
+
+ $command [opts] -e <keyfile.pub>
+
+Encrypts stdin to stdout using the supplied public key file
+
+
+ $command [opts] -d <keyfile>
+
+Decrypts stdin to stdout, using the supplied private key file (may
+also be a keypair file)
+
+
+Common options:
+
+ -s  -  sets the one-time password size (in bits).  Default: 256
+
+ -S  -  sets the RSA key size (in bits).  Default: 4096
+
+USAGE
+}
+
+
+while getopts "hedgs:S:" OPTION
+do
+     case "$OPTION" in
+         h|d|e|g)
+	     [[ -z "$operation" ]] || die "can only use one of -e -d or -g"
+	     operation=$OPTION
+             ;;
+	 s)
+	     [[ "$OPTARG" -lt 0 ]] || die "one-time key size must be numeric and positive"
+	     ONETIMEKEYSIZE=$OPTARG;;
+	 
+	 S)
+	     [[ "$OPTARG" -lt 0 ]] || die "RSA key size must be numeric and positive"
+	     RSAKEYSIZE=$OPTARG;;
+	 
+         *)
+             usage
+	     exit 1
+             ;;
+     esac
+done
+
+# remove the options from the argument list
+shift $((OPTIND-1))
+
+# Validate the remaining options
+[[ $# == 1 ]] || die "You must supply a key file as the only argument"
+
+
+# Execute the appropriate action
+case "$operation" in
+    d) decrypt "$1"; exit;;
+    e) encrypt "$1"; exit;;
+    g) genkeys "$1"; exit;;
+esac
+
+warn "You must supply one of the options d, e, g or h."
+usage;
+exit 1;
