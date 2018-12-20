@@ -1,0 +1,25 @@
+{
+  "name": "hencrypt",
+  "version": "0.1.0",
+  "description": "Hybrid encryption of large files using openssl.",
+  "main": "hencrypt",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wu-lee/hencrypt.git"
+  },
+  "keywords": [
+    "#"
+  ],
+  "author": "bash openssl hybrid encryption",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wu-lee/hencrypt/issues"
+  },
+  "homepage": "https://github.com/wu-lee/hencrypt"
+}
