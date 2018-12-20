@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "cd tests; bats *.bats"
   },
   "repository": {
     "type": "git",
@@ -21,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/wu-lee/hencrypt/issues"
   },
-  "homepage": "https://github.com/wu-lee/hencrypt"
+  "homepage": "https://github.com/wu-lee/hencrypt",
+  "devDependencies": {
+    "bats": "^1.1.0"
+  }
 }
