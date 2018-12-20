@@ -75,6 +75,7 @@
 #
 
 set -o pipefail
+set -o errexit
 
 # Defaults
 
