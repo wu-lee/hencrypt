@@ -228,27 +228,29 @@ Common options:
 USAGE
 }
 
-
 while getopts "hedgs:S:" OPTION
 do
-     case "$OPTION" in
-         h|d|e|g)
-	     [[ -z "$operation" ]] || die "can only use one of -e -d or -g"
-	     operation=$OPTION
-             ;;
-	 s)
-	     [[ "$OPTARG" -lt 0 ]] || die "one-time key size must be numeric and positive"
-	     ONETIMEKEYSIZE=$OPTARG;;
-	 
-	 S)
-	     [[ "$OPTARG" -lt 0 ]] || die "RSA key size must be numeric and positive"
-	     RSAKEYSIZE=$OPTARG;;
-	 
-         *)
-             usage
-	     exit 1
-             ;;
-     esac
+    case "$OPTION" in
+        h|d|e|g)
+	    [[ -z "$operation" ]] || die "can only use one of -e -d or -g"
+	    operation=$OPTION
+            ;;
+
+	s)
+	    [[ "$OPTARG" -lt 0 ]] || die "one-time key size must be numeric and positive"
+	    ONETIMEKEYSIZE=$OPTARG
+	    ;;
+	
+	S)
+	    [[ "$OPTARG" -lt 0 ]] || die "RSA key size must be numeric and positive"
+	    RSAKEYSIZE=$OPTARG
+	    ;;
+	
+        *)
+            usage
+	    exit 1
+            ;;
+    esac
 done
 
 # remove the options from the argument list
