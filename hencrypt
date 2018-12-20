@@ -187,8 +187,9 @@ function decrypt() {
 
 # Just prints usage to stderr
 usage() {
-  command=`basename $0`
-  cat >&2 <<USAGE;
+    local command
+    command=$(basename $0)
+    cat >&2 <<USAGE;
 
 $command: a utility for hybrid-encryption of potentially large streams or files.
 
