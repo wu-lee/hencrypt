@@ -139,16 +139,17 @@ function rsadecrypt() {
 # and then written out base64-encoded as the first line.
 # Then the standard input is encrypted as the rest of the stream, in binary format.
 function encrypt() {
+    local onetimekey eonetimekey
     local pubkeyfile=${1?You must supply a public key file}
     [ -f "$pubkeyfile" ] || die "No such file: $pubkeyfile"
 
     # Generate a random one-time key for symmetric encryption
-    local onetimekey=$(genonetime)
+    onetimekey=$(genonetime) || die "genonetime failed"
 
     # Encrypt it with asymmetric RSA encryption.
     # Use a herestring to avoid putting onetimekey in a file or the arglist
     # However, we don't care so much once it is encrypted.
-    local eonetimekey=$(rsaencrypt "$pubkeyfile" <<<"$onetimekey")
+    eonetimekey=$(rsaencrypt "$pubkeyfile" <<<"$onetimekey") || die "rsaencrypt failed"
     
     # Print the encrypted key first
     cat <<<"$eonetimekey"
@@ -173,11 +174,10 @@ function decrypt() {
     local eonetimekey
     read -r eonetimekey
 
-    # Decrypt it.  Use a herestring/read to avoid putting onetimekey
-    # in a file or the arglist.  Process substitution (< <) is required to
-    # as read doesn't work with pipes
+    # Decrypt it.  Use a herestring to avoid putting onetimekey
+    # in a file or the arglist.
     local onetimekey
-    read -r onetimekey < <(rsadecrypt "$privkeyfile" <<<"$eonetimekey")
+    onetimekey=$(rsadecrypt "$privkeyfile" <<<"$eonetimekey") || die "rsadecrypt failed"
 
     # Decrypt the rest of the stream with it
     # (actually openssl treats it as a password, so we can use base64)
