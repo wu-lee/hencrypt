@@ -205,29 +205,30 @@ Usage:
 Prints this usage.
 
 
- $command [opts] -g <keyfile>
+ $command [-S] -g <keyfile>
 
 Generates a new RSA keypair in <keyfile> and copies the public portion
 to <keyfile>.pub. Use the former for decryption, and the latter for
 encryption.
 
 
- $command [opts] -e <keyfile.pub>
+ $command [-s] -e <keyfile.pub>
 
 Encrypts stdin to stdout using the supplied public key file
 
 
- $command [opts] -d <keyfile>
+ $command -d <keyfile>
 
 Decrypts stdin to stdout, using the supplied private key file (may
 also be a keypair file)
 
 
-Common options:
+The following options can be supplied in some cases (as indicated),
+and are ignored otherwise:
 
- -s  -  sets the one-time password size (in bits).  Default: 256
+   -s  -  sets the one-time password size (in bits).  Default: 256
 
- -S  -  sets the RSA key size (in bits).  Default: 4096
+   -S  -  sets the RSA key size (in bits).  Default: 4096
 
 USAGE
 }
