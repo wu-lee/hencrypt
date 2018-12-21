@@ -172,7 +172,7 @@ function decrypt() {
     # Read our RSA encrypted base64 encoded one time key from the
     # first line of stdin.
     local eonetimekey
-    read -r eonetimekey
+    read -r eonetimekey || die "EOF reading encrypted one-time key"
 
     # Decrypt it.  Use a herestring to avoid putting onetimekey
     # in a file or the arglist.
