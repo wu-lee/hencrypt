@@ -278,6 +278,4 @@ case "$operation" in
     g) genkeys "$1"; exit;;
 esac
 
-warn "you must supply one of the options d, e, g or h."
-usage
-exit 1
+die "you must supply one of the options d, e, g or h."
