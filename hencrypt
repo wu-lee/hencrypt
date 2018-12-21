@@ -260,6 +260,11 @@ done
 # remove the options from the argument list
 shift $((OPTIND-1))
 
+if [[ "$operation" == "h" ]]; then
+    usage
+    exit 0
+fi
+
 # Validate the remaining options
 [[ $# == 1 ]] || die "You must supply a key file as the only argument"
 
