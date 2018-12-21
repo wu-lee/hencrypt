@@ -98,7 +98,7 @@ function die() {
 
 # Generates an ASCII-armoured RSA keypair to stdout
 function genkeys() {
-    local keyfile=${1?You must supply a key filename}
+    local keyfile=${1?you must supply a key filename}
     warn "Writing keypair to $keyfile:"
     "$OPENSSL" genrsa "$RSAKEYSIZE"  >$keyfile
     warn "Copying public key to $keyfile.pub:"
@@ -118,7 +118,7 @@ function genonetime() {
 #
 # Output should just be one line to work correctly.
 function rsaencrypt() {
-    local pubkeyfile=${1?You must supply a public key file}
+    local pubkeyfile=${1?you must supply a public key file}
     "$BASE64" -d | "$OPENSSL" rsautl -encrypt -pubin -inkey "$pubkeyfile" | "$BASE64" -w0
 }
 
@@ -129,7 +129,7 @@ function rsaencrypt() {
 #
 # Output should just be one line to work correctly.
 function rsadecrypt() {
-    local privkeyfile=${1?You must supply a private key file}
+    local privkeyfile=${1?you must supply a private key file}
     "$BASE64" -d | "$OPENSSL" rsautl -decrypt -inkey "$privkeyfile" | "$BASE64" -w0
 }
 
@@ -140,8 +140,8 @@ function rsadecrypt() {
 # Then the standard input is encrypted as the rest of the stream, in binary format.
 function encrypt() {
     local onetimekey eonetimekey
-    local pubkeyfile=${1?You must supply a public key file}
-    [ -f "$pubkeyfile" ] || die "No such file: $pubkeyfile"
+    local pubkeyfile=${1?you must supply a public key file}
+    [ -f "$pubkeyfile" ] || die "no such file: $pubkeyfile"
 
     # Generate a random one-time key for symmetric encryption
     onetimekey=$(genonetime) || die "genonetime failed"
@@ -166,8 +166,8 @@ function encrypt() {
 # decrypted using the private key file supplied, used to decrypt the rest of the
 # binary stream on stdin.
 function decrypt() {
-    local privkeyfile=${1?You must supply a private key file}
-    [ -f "$privkeyfile" ] || die "No such file: $privkeyfile"
+    local privkeyfile=${1?you must supply a private key file}
+    [ -f "$privkeyfile" ] || die "no such file: $privkeyfile"
 
     # Read our RSA encrypted base64 encoded one time key from the
     # first line of stdin.
@@ -266,8 +266,10 @@ if [[ "$operation" == "h" ]]; then
 fi
 
 # Validate the remaining options
-[[ $# == 1 ]] || die "You must supply a key file as the only argument"
-
+if [[ $# != 1 ]]; then
+    usage
+    die "you must supply a key file as the only argument"
+fi
 
 # Execute the appropriate action
 case "$operation" in
@@ -276,6 +278,6 @@ case "$operation" in
     g) genkeys "$1"; exit;;
 esac
 
-warn "You must supply one of the options d, e, g or h."
-usage;
-exit 1;
+warn "you must supply one of the options d, e, g or h."
+usage
+exit 1
