@@ -241,12 +241,12 @@ do
             ;;
 
 	s)
-	    [[ "$OPTARG" -lt 0 ]] || die "one-time key size must be numeric and positive"
+	    [[ "$OPTARG" -gt 0 ]] || die "one-time key size must be numeric and positive"
 	    ONETIMEKEYSIZE=$OPTARG
 	    ;;
 	
 	S)
-	    [[ "$OPTARG" -lt 0 ]] || die "RSA key size must be numeric and positive"
+	    [[ "$OPTARG" -gt 0 ]] || die "RSA key size must be numeric and positive"
 	    RSAKEYSIZE=$OPTARG
 	    ;;
 	
