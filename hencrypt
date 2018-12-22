@@ -87,7 +87,7 @@ CYPHEROPT=-aes-256-cbc
 
 # Write to stderr
 function warn() {
-    echo "$*" >&2
+    printf "%s\n" "$*" >&2
 }
 
 # Exit with a nonzero code, printing the arguments on stderr
