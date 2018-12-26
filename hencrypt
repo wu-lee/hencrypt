@@ -187,12 +187,10 @@ function decrypt() {
 
 # Just prints usage to stderr
 usage() {
-    local command
     # Avoiding the use of external commands like cat, basename. 
-    command=${0##*/}
-    while read -r line; do
+    while IFS='' read -r line; do
 	printf "%s\n" "$line" >&2
-    done <<USAGE;
+    done <<'USAGE';
 
 $command: a utility for hybrid-encryption of potentially large streams
 or files.
