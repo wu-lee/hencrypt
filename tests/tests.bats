@@ -107,7 +107,7 @@ function setup {
 @test "no options or parameters" {
     run ../hencrypt
     [ "$status" -ne 0 ]
-    grep 'Usage:' <<<$output
+    grep 'USAGE:' <<<$output
     grep 'exiting: you must supply a key file as the only argument' <<<$output
 }
 
@@ -128,7 +128,7 @@ function setup {
 @test "help" {
     run ../hencrypt -h
     [ "$status" -eq 0 ]
-    grep 'Usage:' <<<$output
+    grep 'USAGE:' <<<$output
 }
 
 @test "bad options: nonnumeric -s" {

@@ -192,41 +192,41 @@ usage() {
 	printf "%s\n" "$line" >&2
     done <<'USAGE';
 
-$command: a utility for hybrid-encryption of potentially large streams
-or files.
-
-Usage:
+hencrypt - Hybrid encryption of potentially large datastreams.
 
 
- $command -h 
+USAGE:
+
+    hencrypt -h 
 
 Prints this usage.
 
 
- $command [-S] -g <keyfile>
+    hencrypt [-S] -g <keyfile>
 
 Generates a new RSA keypair in <keyfile> and copies the public portion
 to <keyfile>.pub. Use the former for decryption, and the latter for
 encryption.
 
 
- $command [-s] -e <keyfile.pub>
+    hencrypt [-s] -e <keyfile.pub>
 
 Encrypts stdin to stdout using the supplied public key file
 
 
- $command -d <keyfile>
+    hencrypt -d <keyfile>
 
 Decrypts stdin to stdout, using the supplied private key file (may
-also be a keypair file)
+also be a keypair file).
 
 
 The following options can be supplied in some cases (as indicated),
 and are ignored otherwise:
 
-   -s  -  sets the one-time password size (in bits).  Default: 256
+ - `-s` - sets the one-time key size (in bits).  Default: 256
 
-   -S  -  sets the RSA key size (in bits).  Default: 4096
+ - `-S` - sets the RSA key size (in bits).  Default: 4096
+
 
 USAGE
 }
