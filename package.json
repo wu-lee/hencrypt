@@ -7,7 +7,8 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "cd tests; bats *.bats"
+    "test": "cd tests; bats *.bats",
+    "insert-usage": "perl insert-usage.pl"
   },
   "repository": {
     "type": "git",
