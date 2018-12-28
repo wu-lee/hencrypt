@@ -79,6 +79,9 @@ set -o errexit
 
 # Defaults
 
+# See https://www.keylength.com/en/compare/
+# 4096 RSA/256 AES should be good for a few decades.
+# Note CYPHEROPT correlates with ONETIMEKEYSIZE.
 RSAKEYSIZE=4096
 ONETIMEKEYSIZE=256
 OPENSSL=/usr/bin/openssl
@@ -150,9 +153,16 @@ function encrypt() {
     # Use a herestring to avoid putting onetimekey in a file or the arglist
     # However, we don't care so much once it is encrypted.
     eonetimekey=$(rsaencrypt "$pubkeyfile" <<<"$onetimekey") || die "rsaencrypt failed"
+
+    # 4096 bits is a very strong RSA key length. Encoded in base64
+    # this takes 682 characters. 9999 characters should therefore be
+    # more than adequate for any conceivable RSA strength we could
+    # ever use.
+    [[ ${#eonetimekey} > 9999 ]] && die "unsupported: encrypted one-time keys larger that 9999 chars of base64"
     
-    # Print the encrypted key first
-    printf "%s\n" "$eonetimekey"
+    # Print the encrypted key and its length (in chars) first. We use a length to avoid
+    # permitting an arbitrarily long read on decryption.
+    printf "%04d%s" "${#eonetimekey}" "$eonetimekey"
 
     # Encrypt stdin -> stdout using our one-time key, which is read from stderr
     # (actually openssl treats it as a password, so we can use base64)
@@ -172,7 +182,9 @@ function decrypt() {
     # Read our RSA encrypted base64 encoded one time key from the
     # first line of stdin.
     local eonetimekey
-    read -r eonetimekey || die "EOF reading encrypted one-time key"
+    read -N 4 length
+    [[ "$length" =~ [0-9]{4} ]] || die "invalid length field encountered whilst decrypting"
+    read -N "$length" eonetimekey || die "EOF reading encrypted one-time key"
 
     # Decrypt it.  Use a herestring to avoid putting onetimekey
     # in a file or the arglist.
