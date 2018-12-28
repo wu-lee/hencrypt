@@ -44,7 +44,7 @@ also be a keypair file).
 The following options can be supplied in some cases (as indicated),
 and are ignored otherwise:
 
- - `-s` - sets the one-time password size (in bits).  Default: 256
+ - `-s` - sets the one-time key size (in bits).  Default: 256
 
  - `-S` - sets the RSA key size (in bits).  Default: 4096
 
@@ -56,6 +56,8 @@ files in an automated backup system for servers. Such a system
 typically needs to encrypt large files, but any keys deployed to the
 server for this are at risk of being captured.
 
+## HYBRID ENCRYPTION
+
 Public key (asymmetric) encryption would seem ideal for this, since
 the encryption key on the server will be a different one to the
 decryption key stored elsewhere. However it is slow and not really
@@ -65,42 +67,110 @@ decryption.
 
 "Hybrid encryption" is a combination of public key encryption and
 symmetric encryption.  A public key is used to encrypt a one-time
-password, which is then used to encrypt the payload. The encrypted
-one-time password is stored with the encrypted payload.  Decryption
+key, which is then used to encrypt the payload. The encrypted
+one-time key is stored with the encrypted payload.  Decryption
 is done in reverse: the one-time key is decrypted first with the
 private decryption key, and then used to decrypt the payload.
 
-Ideally this would be performed by an off-the-shelf tool like GPG or
-openssl.  However, GPG tends not to be helpful for batch
-encryption/decryption, and key management is complex. We want to
-avoid needing to create a keyring (which is tied to a user
-directory) import keys, mark them trusted etc.
+## OPENSSL OVER GNUPG
+
+Ideally this encryption would be performed by an off-the-shelf tool
+like GPG or openssl.  However, GPG tends not to be helpful for batch
+encryption/decryption, and key management is complex. We want to avoid
+needing to create a keyring (which is tied to a user directory) import
+keys, mark them trusted etc.
 
 OpenSSL is much simpler to use in this context, as it has no keyring
-to manage. But at the time of writing, it does not support anything
-suitable for encrypting large files or streams. It supports SMIME,
-which nominally would achieve this, but current versions cannot
-decrypt in stream mode, and so despite being able to encrupt a file
-larger than about 2.5GB, you will not be able to decrypt it with
-openssl.
+to manage. 
+
+There does not currently seem to be a third option, except the NaCl
+('salt') library (and forks thereof), which at the time of writing
+does not seem to have a command-line interface.
+
+## AVOIDANCE OF OPENSSL'S S/MIME IMPLEMENTATION
+
+OpenSSL (again, at the time of writing) does not support anything
+suitable for encrypting large files or streams. Although supports
+S/MIME, which is a hybrid encryption scheme which would be suitable,
+current versions of OpenSSL cannot decrypt S/MIME in stream mode. So
+despite being able to encrypt files with openssl, you will not be able
+to decrypt larger than about 2.5GB.
+
+For some background about problems, see:
+
+> "Attempting to decrypt/decode a large smime encoded file created with
+> openssl fails regardless of the amount of OS memory available"
+
+https://mta.openssl.org/pipermail/openssl-dev/2016-August/008237.html
+
+Key points are:
+
+- streaming smime *encryption* has been implemented, but
+- smime *decryption* is done in memory, consequentially you can't decrypt
+anything over 1.5G
+- possibly this is related to the BUF_MEM structure's dependency on the size of
+a C `int`
+
+There's also a Github ticket here. Closed, apparently as "won't fix"
+(yet?). This issue persists on (for example) the current Ubuntu LTS
+release, Bionic Beaver (using OpenSSL 1.1.0g).
+
+https://github.com/openssl/openssl/issues/2515
+
+Note: One C implementation which claims to be able to decrypt large
+S/MIME files is referenced in the comments.
+
+## IMPLEMENTATION
 
 Therefore this script was written to implement hybrid encryption of
-large files using openssl.
+large files using the basic scheme using the openssl CLI ourlined in
+various places online, as simply as possible in Bash, whilst aiming to
+be secure.
 
-Below, the encrypt function uses openssl to generate a
-cryptographically secure random number as a one-time password
-(genonetime).
+The `encrypt` function uses openssl to generate a cryptographically
+secure random number as a one-time key (genonetime).
 
-This is then encrypted with a public key (rsaencrypt), and sent
+This is then encrypted with a public key (`rsaencrypt`), and sent
 encoded in base64 as the second field of the encrypted stream to
 stdout, followed by the encrypted payload read from stdin. The first
 field is four characters encoding the number of characters of the
 second in decimal.
 
-The decrypt function first reads the 4-character decimal size field
-from stdin, then the key's characters to get the one-time password,
-decodes and decrypts it (rsadecrypt), then decrypts the remainder of
-the input stream to stdout using it.
+The `decrypt` function first reads the 4-character decimal size field
+`<N>` from stdin, then the `<encrypted key>` characters to get the
+one-time key, decodes and decrypts it (`rsadecrypt`), then decrypts
+the remainder of the openssl encrypted stream to stdout using it.
+
+Stream format:
+
+    <N><encrypted key><openssl encrypted stream>
+	
+ - `<N>` - a 4 character decimal number indicating the characters in
+   the following field
+ - `<encrypted key>` - a base64-encoded RSA-encrypted one-time key
+ - `<openssl encrypted stream>` - the symmetric-encrypted payload
+
+# CAVEATS / DISCLAIMER
+
+This script works correctly to the best of my knowledge. However, as
+ever with open source software: inspect the source code and use at
+your own risk.
+
+Although the choice of Bash for implementing this script may be
+debatable considering the defensive programming required, by
+piggy-backing on the openssl command-line programs this also avoids a
+class of errors I gather is possible when using the OpenSSL API
+directly. (Due to overflows and the potentially poor choices of
+parameters allowed by the API.)  It is also more concise than an
+equivalent would be if written in a language like C/Python/Perl/Ruby
+and calling the `openssl` CLI. And it avoids requiring the non-core
+libraries needed for direct OpenSSL API support.
+
+Nevertheless, it is ultimately intended as a usable stop-gap until an
+offically supported hybrid encryption tool becomes available.
+
+Otherwise, I may yet add an implementation in an alternative language.
+
 
 # REQUIREMENTS
 
@@ -112,8 +182,8 @@ the input stream to stdout using it.
 encoding as it can be coerced to write on a single line.)
 
 
-The script aims to be self-contained, so see inline documentation
-within the `hencrypt` script itself.
+The script aims to be self-contained so far as possible, and
+deliberately does not use any other non built-in commands than these.
 
 
 # TESTS
