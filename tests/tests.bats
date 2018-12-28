@@ -174,35 +174,35 @@ function setup {
 }
 
 @test "missing decryption key" {
-    run HENCRYPT_IO -d tmp/missing data/lorem tmp/enc
+    run HENCRYPT_IO -d tmp/missing data/lorem tmp/dec
     [ "$status" -ne 0 ]
     grep 'exiting: no such file: tmp/missing' <<<$output
 }
 
 @test "empty encryption key" {
-    touch tmp/empty
+    printf "" >tmp/empty
     run HENCRYPT_IO -e tmp/empty data/lorem tmp/enc
     [ "$status" -ne 0 ]
     grep 'exiting: rsaencrypt failed' <<<$output
 }
 
-@test "empty decryption key" {
-    touch tmp/empty
-    run HENCRYPT_IO -d tmp/empty data/lorem tmp/enc
-    [ "$status" -ne 0 ]
-    grep 'exiting: rsadecrypt failed' <<<$output
-}
-
 @test "empty file encrypting" {
-    touch tmp/empty
+    printf "" >tmp/empty
     run HENCRYPT_IO -e data/key1.pub tmp/empty tmp/enc
     [ "$status" -eq 0 ]
     [ -s tmp/enc ]
 }
 
-@test "empty file decrypting" {
-    touch tmp/empty
-    run HENCRYPT_IO -d data/key1 tmp/empty tmp/dec
+@test "bad length in file decrypting" {
+    printf "000." >tmp/bad
+    run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: invalid length field encountered whilst decrypting' <<<$output
+}
+
+@test "overlong length in file decrypting" {
+    printf "0100a" >tmp/bad
+    run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
     [ "$status" -ne 0 ]
     grep 'exiting: EOF reading encrypted one-time key' <<<$output
 }
