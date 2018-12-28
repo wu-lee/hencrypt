@@ -92,13 +92,15 @@ cryptographically secure random number as a one-time password
 (genonetime).
 
 This is then encrypted with a public key (rsaencrypt), and sent
-encoded in base64 as the first line of the encrypted stream to
-stdout, followed by the encrypted payload read from stdin.
+encoded in base64 as the second field of the encrypted stream to
+stdout, followed by the encrypted payload read from stdin. The first
+field is four characters encoding the number of characters of the
+second in decimal.
 
-The decrypt function first reads a line from stdin to get the
-one-time password, decodes and decrypts it (rsadecrypt), then
-decrypts the remainder of the input stream to stdout using it.
-
+The decrypt function first reads the 4-character decimal size field
+from stdin, then the key's characters to get the one-time password,
+decodes and decrypts it (rsadecrypt), then decrypts the remainder of
+the input stream to stdout using it.
 
 # REQUIREMENTS
 
