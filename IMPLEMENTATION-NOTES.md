@@ -8,12 +8,14 @@ programming tactics.
 
 - Use local vars in functions
 - Target Bash explicitly
-- Preassign local when shell expanding
+- Signal errors with a `die` function
+- Use pipefail, errexit options
 - Check the return codes when shell expanding
+- Preassign local when shell expanding
 - Don't double shell-expand
 - Don't use temp files
 - Don't put sensitive data in parameters, pipe in via here-vars instead
-- Use pipefail, errexit options
+- Don't put sensitive data in the environment
 - Don't store binary data in vars, base64-encode it
 - Always use full paths to external commands
 - Quote variables by default, to avoid argument splitting
@@ -87,7 +89,7 @@ So check for errors explicitly:
     foo=$(false) || die "something failed"
 
 
-### preassign local when shell expanding
+### Preassign local when shell expanding
 
 The above trick will not work with `local`:
 
