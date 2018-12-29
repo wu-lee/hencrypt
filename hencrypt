@@ -109,9 +109,12 @@ function genkeys() {
 }
 
 # Generates a random key, in base64.
-# Output is on stdout and should be on one line to work correctly.
+# Output is on stdout and the significant data on the first line to work correctly.
+# A dummy linefeed is appended so that `read` will not return an error code
+# because of EOF.
 function genonetime() {
-    "$OPENSSL" rand  "$ONETIMEKEYSIZE" | "$BASE64" -w0
+    "$OPENSSL" rand  "$ONETIMEKEYSIZE" | "$BASE64" -w0 &&
+    printf "\n"
 }
 
 # rsaencrypt $pubkeyfile
@@ -119,10 +122,14 @@ function genonetime() {
 # RSA encrypts a base64 encoded stream to a base64 stream on stdout,
 # using the public keyfile given.
 #
-# Output should just be one line to work correctly.
+# Output is on stdout and the significant data on the first line to work correctly.
+# A dummy linefeed is appended so that `read` will not return an error code
+# because of EOF.
 function rsaencrypt() {
-    local pubkeyfile=${1?you must supply a public key file}
-    "$BASE64" -d | "$OPENSSL" rsautl -encrypt -pubin -inkey "$pubkeyfile" | "$BASE64" -w0
+    local pubkeyfile
+    pubkeyfile=${1?you must supply a public key file} &&
+    "$BASE64" -d | "$OPENSSL" rsautl -encrypt -pubin -inkey "$pubkeyfile" | "$BASE64" -w0 &&
+    printf "\n"
 }
 
 # rsadecrypt $privkeyfile
@@ -130,10 +137,14 @@ function rsaencrypt() {
 # RSA decrypts a base64 encoded stream to a base64 stream on stdout,
 # using the private keyfile given.
 #
-# Output should just be one line to work correctly.
+# Output is on stdout and the significant data on the first line to work correctly.
+# A dummy linefeed is appended on success so that `read` will not return an error code
+# because of EOF.
 function rsadecrypt() {
-    local privkeyfile=${1?you must supply a private key file}
-    "$BASE64" -d | "$OPENSSL" rsautl -decrypt -inkey "$privkeyfile" | "$BASE64" -w0
+    local privkeyfile
+    privkeyfile=${1?you must supply a private key file} &&
+    "$BASE64" -d | "$OPENSSL" rsautl -decrypt -inkey "$privkeyfile" | "$BASE64" -w0 &&
+    printf "\n"
 }
 
 # encrypt $keyfile - Hybrid-encrypts stdin to stdout.
@@ -147,7 +158,8 @@ function encrypt() {
     [ -f "$pubkeyfile" ] || die "no such file: $pubkeyfile"
 
     # Generate a random one-time key for symmetric encryption
-    onetimekey=$(genonetime) || die "genonetime failed"
+    # Avoid exposing the value via shell-expansion, use read.
+    read -r onetimekey < <(genonetime) || die "genonetime failed"
 
     # Encrypt it with asymmetric RSA encryption.
     # Use a herestring to avoid putting onetimekey in a file or the arglist
@@ -186,10 +198,11 @@ function decrypt() {
     [[ "$length" =~ [0-9]{4} ]] || die "invalid length field encountered whilst decrypting"
     read -N "$length" eonetimekey || die "EOF reading encrypted one-time key"
 
-    # Decrypt it.  Use a herestring to avoid putting onetimekey
-    # in a file or the arglist.
+    # Decrypt it.  Use a herestring to avoid putting onetimekey in a
+    # file or the arglist. Avoid exposing the value via
+    # shell-expansion, use read.
     local onetimekey
-    onetimekey=$(rsadecrypt "$privkeyfile" <<<"$eonetimekey") || die "rsadecrypt failed"
+    read -r onetimekey < <(rsadecrypt "$privkeyfile" <<<"$eonetimekey") || die "rsadecrypt failed"
 
     # Decrypt the rest of the stream with it
     # (actually openssl treats it as a password, so we can use base64)
