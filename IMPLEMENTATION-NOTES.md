@@ -15,6 +15,7 @@ programming tactics.
 - Don't double shell-expand
 - Don't use temp files
 - Don't put sensitive data in parameters, pipe in via here-vars instead
+- Don't put sensitive data in variable assignments 
 - Don't put sensitive data in the environment
 - Don't store binary data in vars, base64-encode it
 - Always use full paths to external commands
@@ -153,6 +154,41 @@ Use pipes instead whenever possible.
 
     dosomething -withstdin <<<$secret
 
+
+### Don't put sensitive data in variable assignments 
+
+If the script can be run with the `-x` option enabled, the value
+assigned will be echoed to stdout.
+
+In these cases it's a bit awkward, but instead of this:
+
+    foo=$(print_secret)
+	
+...you can do this (which is the only way to read from data without
+creating a subshell, which would defeat the purpose of assignment by
+creating a new and inaccessable shell variable in the subshell).
+
+    read -r foo < <(print_secret)
+
+The main difficulty is then:
+
+- `read` returns an error code on EOF (which will kill the script if
+  the errfail option is enabled)
+- in any case the return code of the subshell is lost
+
+A workaround is to have whatever you have in place of `print_secret`
+only write a linefeed at the end in the case of success.  This
+triggers `read` to fail on failure.
+
+     function print_secret() {
+		 get_secret && printf "\n"		 
+	 }
+
+This delimiter gets discarded, but don't append any other characters
+or it will show up in the stdout.
+
+But we avoid this if this isn't strictly necessary, best to use
+shell-expansion assignments.
 
 ### Don't put sensitive data in the environment
 
