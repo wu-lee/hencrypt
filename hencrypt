@@ -1,78 +1,11 @@
 #!/bin/bash
 
-# Author: Nick Stokoe, November 2018
-#
-# Adapted from:
-# http://bikulov.org/blog/2013/10/12/hybrid-symmetric-asymmetric-encryption-for-large-files/
-#
-# SYNOPSYS
-#
-# Encrypts/decrypts stdin to stdout. See usage function below for
-# options and parameters.
-#
-# AIMS
-#
-# This script aims to be useful for encrypting/decrypting large backup
-# files in an automated backup system for servers. Such a system
-# typically needs to encrypt large files, but any keys deployed to the
-# server for this are at risk of being captured.
-#
-# Public key (asymmetric) encryption would seem ideal for this, since
-# the encryption key on the server will be a different one to the
-# decryption key stored elsewhere. However it is slow and not really
-# suitable for encrypting large amounts of data. Whereas, symmetric
-# encryption is fast but uses the same key for encryption and
-# decryption.
-#
-# "Hybrid encryption" is a combination of public key encryption and
-# symmetric encryption.  A public key is used to encrypt a one-time
-# password, which is then used to encrypt the payload. The encrypted
-# one-time password is stored with the encrypted payload.  Decryption
-# is done in reverse: the one-time key is decrypted first with the
-# private decryption key, and then used to decrypt the payload.
-#
-# Ideally this would be performed by an off-the-shelf tool like GPG or
-# openssl.  However, GPG tends not to be helpful for batch
-# encryption/decryption, and key management is complex. We want to
-# avoid needing to create a keyring (which is tied to a user
-# directory) import keys, mark them trusted etc.
-#
-# OpenSSL is much simpler to use in this context, as it has no keyring
-# to manage. But at the time of writing, it does not support anything
-# suitable for encrypting large files or streams. It supports SMIME,
-# which nominally would achieve this, but current versions cannot
-# decrypt in stream mode, and so despite being able to encrupt a file
-# larger than about 2.5GB, you will not be able to decrypt it with
-# openssl.
-#
-# Therefore this script was written to implement hybrid encryption of
-# large files using openssl.
-#
-# Below, the encrypt function uses openssl to generate a
-# cryptographically secure random number as a one-time password
-# (genonetime).
-#
-# This is then encrypted with a public key (rsaencrypt), and sent
-# encoded in base64 as the first line of the encrypted stream to
-# stdout, followed by the encrypted payload read from stdin.
-#
-# The decrypt function first reads a line from stdin to get the
-# one-time password, decodes and decrypts it (rsadecrypt), then
-# decrypts the remainder of the input stream to stdout using it.
-#
-# REQUIREMENTS
-#
-# - bash
-# - openssl
-# - base64 (From the coreutils package on Debian/RedHat)
-#
-# (Note: the base64 command is used in preference to openssl's base64
-# encoding as it can be coerced to write on a single line.)
-#
-# BUGS / CONTRIBUTIONS
+# Author: Nick Stokoe
 #
 # https://github.com/wu-lee/hencrypt
 #
+# For usage, execute with no parameters, or see the `usage` function
+# below.
 
 set -o pipefail
 set -o errexit
