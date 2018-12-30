@@ -49,6 +49,11 @@ and are ignored otherwise:
  - `-S` - sets the RSA key size (in bits).  Default: 4096
 
 
+    hencrypt -v
+
+Prints out version information.
+
+
 # AIMS
 
 This script aims to be useful for encrypting/decrypting large backup

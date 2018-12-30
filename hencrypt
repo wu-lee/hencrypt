@@ -32,6 +32,19 @@ function die() {
     exit 1
 }
 
+# We use this to avoid the use of `cat`.  Works much the same,
+# except it optionally omits lines matching a regex
+function copyout() {
+    while IFS='' read -r line; do
+	[[ -n "$1" && "$line" =~ $1 ]] || printf "%s\n" "$line"
+    done
+}
+
+# Versioning 
+VERSION=0.1.0
+OPENSSL_VERSION=$("$OPENSSL" version) || die "Failed to get openssl version"
+BASE64_VERSION=$("$BASE64" --version) || die "Failed to get base64 version"
+
 # Generates an ASCII-armoured RSA keypair to stdout
 function genkeys() {
     local keyfile=${1?you must supply a key filename}
@@ -146,9 +159,7 @@ function decrypt() {
 # Just prints usage to stderr
 usage() {
     # Avoiding the use of external commands like cat, basename. 
-    while IFS='' read -r line; do
-	printf "%s\n" "$line" >&2
-    done <<'USAGE';
+    copyout <<'USAGE' >&2;
 
 hencrypt - Hybrid encryption of potentially large datastreams.
 
@@ -186,13 +197,19 @@ and are ignored otherwise:
  - `-S` - sets the RSA key size (in bits).  Default: 4096
 
 
+    hencrypt -v
+
+Prints out version information.
+
+
 USAGE
 }
 
-while getopts "hedgs:S:" OPTION
+
+while getopts "hedgvs:S:" OPTION
 do
     case "$OPTION" in
-        h|d|e|g)
+        h|d|e|g|v)
 	    [[ -z "$operation" ]] || die "can only use one of -e -d or -g"
 	    operation=$OPTION
             ;;
@@ -221,6 +238,28 @@ if [[ "$operation" == "h" ]]; then
     usage
     exit 0
 fi
+
+if [[ "$operation" == "v" ]]; then
+    copyout <<EOF
+
+VERSIONS
+
+hencrypt:
+VERSION: $VERSION
+CYPHEROPT: $CYPHEROPT
+RSAKEYSIZE: $RSAKEYSIZE
+ONETIMEKEYSIZE: $ONETIMEKEYSIZE
+
+openssl:
+$($OPENSSL version -a)
+
+base64:
+$($BASE64 --version)
+
+EOF
+    exit 0
+fi
+
 
 # Validate the remaining options
 if [[ $# != 1 ]]; then

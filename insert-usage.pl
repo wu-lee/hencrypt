@@ -76,4 +76,5 @@ close $fh
 
 rename "$HENCRYPT.new", $HENCRYPT
     or die "Failed to rename $HENCRYPT.new as $HENCRYPT: $!";
+
 chmod 0755, $HENCRYPT;
