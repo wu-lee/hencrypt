@@ -152,6 +152,14 @@ function decrypt() {
     [[ "$length" =~ [0-9]{2} ]] || die "invalid versioninfo length field encountered whilst decrypting"
     read -N "$length" versioninfo || die "EOF reading versioninfo field"
     warn "versioninfo: $versioninfo"
+
+    # Get the second word of $versioninfo
+    local versionwords=($versioninfo)
+    local version="${versionwords[1]}"
+
+    # Compare the significant version components of the file with ours.
+    [[ "${version%.*}" == "${VERSION%.*}" ]] ||
+	die "hencrypt version mismatch $version!=$VERSION"
     
     read -N 4 length || die "EOF reading one-time key length field"
     [[ "$length" =~ [0-9]{4} ]] || die "invalid one-time key length field encountered whilst decrypting"

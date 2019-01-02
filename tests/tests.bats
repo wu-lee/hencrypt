@@ -214,23 +214,38 @@ function setup {
     grep 'exiting: EOF reading versioninfo field' <<<$output
 }
 
+# This should  be a valid and acceptable versioninfo field
+versioninfo=$'22hencrypt 0.1.0\nxxx\nxxx'
+
 @test "bad one-time key length in file decrypting" {
-    printf "01x000." >tmp/bad
+    printf "${versioninfo}000." >tmp/bad
     run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
     [ "$status" -ne 0 ]
     grep 'exiting: invalid one-time key length field encountered whilst decrypting' <<<$output
 }
 
 @test "short one-time key length field in file decrypting" {
-    printf "01x001" >tmp/bad
+    printf "${versioninfo}001" >tmp/bad
     run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
     [ "$status" -ne 0 ]
     grep 'exiting: EOF reading one-time key length field' <<<$output
 }
 
 @test "overlong length in file decrypting" {
-    printf "01x0010x" >tmp/bad
+    printf "${versioninfo}0010x" >tmp/bad
     run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
     [ "$status" -ne 0 ]
     grep 'exiting: EOF reading one-time key field' <<<$output
+}
+
+@test "will decrypt files with compatible version difference" {
+    run HENCRYPT_IO -d data/key2 data/enc.goodversion tmp/dec
+    [ "$status" -eq 0 ]
+    diff -q data/lorem tmp/dec
+}
+
+@test "will not decrypt files with incompatible version difference" {
+    run HENCRYPT_IO -d data/key2 data/enc.badversion tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: hencrypt version mismatch' <<<$output
 }
