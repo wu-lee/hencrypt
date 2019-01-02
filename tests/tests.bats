@@ -238,6 +238,13 @@ versioninfo=$'22hencrypt 0.1.0\nxxx\nxxx'
     grep 'exiting: EOF reading one-time key field' <<<$output
 }
 
+@test "will not decrypt files without 'hencrypt' keyword" {
+    printf "22hencript 0.1.0\nxxx\nyyy" >tmp/bad
+    run HENCRYPT_IO -d data/key2 tmp/bad tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: not a hencrypt file' <<<$output
+}
+
 @test "will decrypt files with compatible version difference" {
     run HENCRYPT_IO -d data/key2 data/enc.goodversion tmp/dec
     [ "$status" -eq 0 ]

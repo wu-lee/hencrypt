@@ -153,9 +153,14 @@ function decrypt() {
     read -N "$length" versioninfo || die "EOF reading versioninfo field"
     warn "versioninfo: $versioninfo"
 
-    # Get the second word of $versioninfo
+
     local versionwords=($versioninfo)
+
+    # Check the first versioninfo field is 'hencrypt'
+    
     local version="${versionwords[1]}"
+    [[ "${versionwords[0]}" == "hencrypt" ]] ||
+	die "not a hencrypt file"
 
     # Compare the significant version components of the file with ours.
     [[ "${version%.*}" == "${VERSION%.*}" ]] ||
