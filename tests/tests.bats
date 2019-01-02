@@ -193,16 +193,44 @@ function setup {
     [ -s tmp/enc ]
 }
 
-@test "bad length in file decrypting" {
-    printf "000." >tmp/bad
+@test "bad versioninfo length in file decrypting" {
+    printf "0." >tmp/bad
     run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
     [ "$status" -ne 0 ]
-    grep 'exiting: invalid length field encountered whilst decrypting' <<<$output
+    grep 'exiting: invalid versioninfo length field encountered whilst decrypting' <<<$output
+}
+
+@test "short versioninfo length field in file decrypting" {
+    printf "1" >tmp/bad
+    run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: EOF reading versioninfo length field' <<<$output
+}
+
+@test "overlong versioninfo length in file decrypting" {
+    printf "10a" >tmp/bad
+    run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: EOF reading versioninfo field' <<<$output
+}
+
+@test "bad one-time key length in file decrypting" {
+    printf "01x000." >tmp/bad
+    run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: invalid one-time key length field encountered whilst decrypting' <<<$output
+}
+
+@test "short one-time key length field in file decrypting" {
+    printf "01x001" >tmp/bad
+    run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
+    [ "$status" -ne 0 ]
+    grep 'exiting: EOF reading one-time key length field' <<<$output
 }
 
 @test "overlong length in file decrypting" {
-    printf "0100a" >tmp/bad
+    printf "01x0010x" >tmp/bad
     run HENCRYPT_IO -d data/key1 tmp/bad tmp/dec
     [ "$status" -ne 0 ]
-    grep 'exiting: EOF reading encrypted one-time key' <<<$output
+    grep 'exiting: EOF reading one-time key field' <<<$output
 }

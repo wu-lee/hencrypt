@@ -40,10 +40,13 @@ function copyout() {
     done
 }
 
-# Versioning 
+# Versioning. IFS set to split on EOL temporarily to capture lines in arrays.
+IFS='
+'
 VERSION=0.1.0
-OPENSSL_VERSION=$("$OPENSSL" version) || die "Failed to get openssl version"
-BASE64_VERSION=$("$BASE64" --version) || die "Failed to get base64 version"
+OPENSSL_VERSION=($("$OPENSSL" version -a)) || die "Failed to get openssl version"
+BASE64_VERSION=($("$BASE64" --version)) || die "Failed to get base64 version"
+unset IFS
 
 # Generates an ASCII-armoured RSA keypair to stdout
 function genkeys() {
@@ -99,7 +102,8 @@ function rsadecrypt() {
 # and then written out base64-encoded as the first line.
 # Then the standard input is encrypted as the rest of the stream, in binary format.
 function encrypt() {
-    local onetimekey eonetimekey
+    local onetimekey eonetimekey versioninfo
+    local n=$'\n'
     local pubkeyfile=${1?you must supply a public key file}
     [ -f "$pubkeyfile" ] || die "no such file: $pubkeyfile"
 
@@ -118,9 +122,13 @@ function encrypt() {
     # ever use.
     [[ ${#eonetimekey} > 9999 ]] && die "unsupported: encrypted one-time keys larger that 9999 chars of base64"
     
-    # Print the encrypted key and its length (in chars) first. We use a length to avoid
-    # permitting an arbitrarily long read on decryption.
-    printf "%04d%s" "${#eonetimekey}" "$eonetimekey"
+    versioninfo="hencrypt $VERSION$n${OPENSSL_VERSION[0]}$n${BASE64_VERSION[0]}"
+    [[ ${#versioninfo} > 99 ]] && die "bug! versioninfo is too long! check output of openssl/base64"
+    
+    # Print the versioninfo, the encrypted key and their lengths (in
+    # chars) first. We use a length to avoid permitting an arbitrarily
+    # long read on decryption.
+    printf "%02d%s%04d%s" "${#versioninfo}" "$versioninfo" "${#eonetimekey}" "$eonetimekey"
 
     # Encrypt stdin -> stdout using our one-time key, which is read from stderr
     # (actually openssl treats it as a password, so we can use base64)
@@ -139,10 +147,15 @@ function decrypt() {
 
     # Read our RSA encrypted base64 encoded one time key from the
     # first line of stdin.
-    local eonetimekey
-    read -N 4 length
-    [[ "$length" =~ [0-9]{4} ]] || die "invalid length field encountered whilst decrypting"
-    read -N "$length" eonetimekey || die "EOF reading encrypted one-time key"
+    local versioninfo eonetimekey length
+    read -N 2 length || die "EOF reading versioninfo length field"
+    [[ "$length" =~ [0-9]{2} ]] || die "invalid versioninfo length field encountered whilst decrypting"
+    read -N "$length" versioninfo || die "EOF reading versioninfo field"
+    warn "versioninfo: $versioninfo"
+    
+    read -N 4 length || die "EOF reading one-time key length field"
+    [[ "$length" =~ [0-9]{4} ]] || die "invalid one-time key length field encountered whilst decrypting"
+    read -N "$length" eonetimekey || die "EOF reading one-time key field"
 
     # Decrypt it.  Use a herestring to avoid putting onetimekey in a
     # file or the arglist. Avoid exposing the value via
@@ -251,10 +264,10 @@ RSAKEYSIZE: $RSAKEYSIZE
 ONETIMEKEYSIZE: $ONETIMEKEYSIZE
 
 openssl:
-$($OPENSSL version -a)
+${OPENSSL_VERSION[*]}
 
 base64:
-$($BASE64 --version)
+${BASE64_VERSION[*]}
 
 EOF
     exit 0
