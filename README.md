@@ -153,7 +153,22 @@ Stream format:
  - `<NN>` - a 2 character decimal number indicating the characters in
    the following field.
  - `<versioninfo>` - contains information about the script and command
-   versions, in the form `hencrypt <X>.<Y>.<Z>\n<openssl>\n<base64>`, where:
+   versions, see below.
+ - `<NNNN>` - a 4 character decimal number indicating the characters
+   in the following field.
+ - `<encrypted key>` - a base64-encoded RSA-encrypted one-time key.
+ - `<openssl encrypted stream>` - the symmetric-encrypted payload.
+
+The intention of the `<versioninfo>` field is to record the versions
+of `hencrypt`, `openssl` and `base64` that were used to create an
+encrypted file, for auditing purposes.  It is also to allow `hencrypt`
+to identify broadly incompatible files which it cannot decrypt,
+because of `hencrypt`'s own schematic differences. It has the form:
+
+    hencrypt <X>.<Y>.<Z>\n<openssl>\n<base64>
+	
+Where:
+
    - The leading `hencrypt` keyword is required.
    - `<X>` is the major version number of hencrypt used.
    - `<Y>` is the minor version number of hencrypt used.
@@ -162,10 +177,8 @@ Stream format:
    - `<openssl>` is line #1 of the version string output by `openssl version -a`.
    - `<base64>` is line #1 of the version string output by `base64 --version`.
    - The latter two are informational only.
- - `<NNNN>` - a 4 character decimal number indicating the characters
-   in the following field.
- - `<encrypted key>` - a base64-encoded RSA-encrypted one-time key.
- - `<openssl encrypted stream>` - the symmetric-encrypted payload.
+   - `\n` is a line-feed character.
+   
 
 # CAVEATS / DISCLAIMER
 
