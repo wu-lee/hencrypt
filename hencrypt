@@ -33,7 +33,7 @@ function die() {
 }
 
 # We use this to avoid the use of `cat`.  Works much the same,
-# except it optionally omits lines matching a regex
+# except it optionally omits lines matching a regex defined by $1
 function copyout() {
     while IFS='' read -r line; do
 	[[ -n "$1" && "$line" =~ $1 ]] || printf "%s\n" "$line"
@@ -48,7 +48,7 @@ OPENSSL_VERSION=($("$OPENSSL" version -a)) || die "Failed to get openssl version
 BASE64_VERSION=($("$BASE64" --version)) || die "Failed to get base64 version"
 unset IFS
 
-# Generates an ASCII-armoured RSA keypair to stdout
+# Generates an ASCII-armoured RSA keypair to the files given by $1 and $1.pub
 function genkeys() {
     local keyfile=${1?you must supply a key filename}
     warn "Writing keypair to $keyfile:"
@@ -57,23 +57,28 @@ function genkeys() {
     "$OPENSSL" rsa -pubout <$keyfile >$keyfile.pub
 }
 
-# Generates a random key, in base64.
-# Output is on stdout and the significant data on the first line to work correctly.
-# A dummy linefeed is appended so that `read` will not return an error code
-# because of EOF.
+# genonetime - Generates a random key, in base64.
+#
+# Output is on stdout and the significant data should be on the first
+# line to work correctly.  A dummy linefeed is appended so that the
+# output, when sent to `read`, will not induce it to return an error
+# code because of EOF (unless there was an error, when it is omitted
+# and an error code returned).
 function genonetime() {
     "$OPENSSL" rand  "$ONETIMEKEYSIZE" | "$BASE64" -w0 &&
     printf "\n"
 }
 
-# rsaencrypt $pubkeyfile
+# rsaencrypt $pubkeyfile - RSA-encrypts using $pubkeyfile
 #
 # RSA encrypts a base64 encoded stream to a base64 stream on stdout,
 # using the public keyfile given.
 #
-# Output is on stdout and the significant data on the first line to work correctly.
-# A dummy linefeed is appended so that `read` will not return an error code
-# because of EOF.
+# Output is on stdout and the significant data on the first line to
+# work correctly.  A dummy linefeed is appended so that the output,
+# when sent to `read`, will not induce it to return an error code
+# because of EOF (unless there was an error, when it is omitted and an
+# error code returned).
 function rsaencrypt() {
     local pubkeyfile
     pubkeyfile=${1?you must supply a public key file} &&
@@ -81,14 +86,16 @@ function rsaencrypt() {
     printf "\n"
 }
 
-# rsadecrypt $privkeyfile
+# rsadecrypt $privkeyfile - RSA-decrypts using $privkeyfile
 #
 # RSA decrypts a base64 encoded stream to a base64 stream on stdout,
 # using the private keyfile given.
 #
-# Output is on stdout and the significant data on the first line to work correctly.
-# A dummy linefeed is appended on success so that `read` will not return an error code
-# because of EOF.
+# Output is on stdout and the significant data on the first line to
+# work correctly.  A dummy linefeed is appended so that the output,
+# when sent to `read`, will not induce it to return an error code
+# because of EOF (unless there was an error, when it is omitted and an
+# error code returned).
 function rsadecrypt() {
     local privkeyfile
     privkeyfile=${1?you must supply a private key file} &&
@@ -96,24 +103,28 @@ function rsadecrypt() {
     printf "\n"
 }
 
-# encrypt $keyfile - Hybrid-encrypts stdin to stdout.
+# encrypt $pubkeyfile - Hybrid-encrypts using $pubkeyfile
 #
-# A one-time key is generated, encrypted using the public RSA key,
-# and then written out base64-encoded as the first line.
-# Then the standard input is encrypted as the rest of the stream, in binary format.
+# A one-time key is generated, encrypted using the public RSA key, and
+# then written out base64-encoded as the first line (with some
+# versioning metadata).  Then the standard input is encrypted as the
+# rest of the stream, in binary format.
+#
+# Exits with an error code on failure.
 function encrypt() {
     local onetimekey eonetimekey versioninfo
     local n=$'\n'
     local pubkeyfile=${1?you must supply a public key file}
     [ -f "$pubkeyfile" ] || die "no such file: $pubkeyfile"
 
-    # Generate a random one-time key for symmetric encryption
-    # Avoid exposing the value via shell-expansion, use read.
+    # Generate a random one-time key for symmetric encryption.
+    # Avoid exposing the value via shell-expansion - use read.
+    # Note: read fails if genonetime returns no EOL
     read -r onetimekey < <(genonetime) || die "genonetime failed"
 
     # Encrypt it with asymmetric RSA encryption.
-    # Use a herestring to avoid putting onetimekey in a file or the arglist
-    # However, we don't care so much once it is encrypted.
+    # Use a herestring to avoid putting onetimekey in a file or the arglist.
+    # However, we don't care so much once it is encrypted, so shell-expanding can be used to get the result.
     eonetimekey=$(rsaencrypt "$pubkeyfile" <<<"$onetimekey") || die "rsaencrypt failed"
 
     # 4096 bits is a very strong RSA key length. Encoded in base64
@@ -131,8 +142,9 @@ function encrypt() {
     printf "%02d%s%04d%s" "${#versioninfo}" "$versioninfo" "${#eonetimekey}" "$eonetimekey" ||
 	die "error formatting versioninfo field"
 
-    # Encrypt stdin -> stdout using our one-time key, which is read from stderr
-    # (actually openssl treats it as a password, so we can use base64)
+    # Encrypt stdin -> stdout using our one-time key, which is read
+    # from stderr (we pass the key encoded as base64 directly, as a
+    # password).
     "$OPENSSL" enc $CYPHEROPT -salt -pass fd:2 2<<<"$onetimekey" ||
 	die "failed to encrypt"
 }
@@ -143,43 +155,48 @@ function encrypt() {
 # base64 encoded, RSA encrypted symmetric cypher key.  This is read,
 # decrypted using the private key file supplied, used to decrypt the rest of the
 # binary stream on stdin.
+#
+# Exits with an error code on failure.
 function decrypt() {
+    local versioninfo eonetimekey length
     local privkeyfile=${1?you must supply a private key file}
     [ -f "$privkeyfile" ] || die "no such file: $privkeyfile"
 
-    # Read our RSA encrypted base64 encoded one time key from the
-    # first line of stdin.
-    local versioninfo eonetimekey length
+    # Read the versioninfo field first, preceeded by a length field.
     read -N 2 length || die "EOF reading versioninfo length field"
     [[ "$length" =~ [0-9]{2} ]] || die "invalid versioninfo length field encountered whilst decrypting"
     read -N "$length" versioninfo || die "EOF reading versioninfo field"
     warn "versioninfo: $versioninfo"
 
-
+    # Split versioninfo on whitespace into words.
     local versionwords=($versioninfo)
 
-    # Check the first versioninfo field is 'hencrypt'
-    
+    # Check the first versioninfo word is 'hencrypt'    
     local version="${versionwords[1]}"
     [[ "${versionwords[0]}" == "hencrypt" ]] ||
 	die "not a hencrypt file"
 
-    # Compare the significant version components of the file with ours.
+    # The second word is the hencrypt version used.
+    # Compare the significant version components (i.e. not the last
+    # component) of the file with ours.
     [[ "${version%.*}" == "${VERSION%.*}" ]] ||
 	die "hencrypt version mismatch $version!=$VERSION"
     
+    # Read the RSA encrypted base64 encoded one time key next,
+    # also preceeded by a length field.
     read -N 4 length || die "EOF reading one-time key length field"
     [[ "$length" =~ [0-9]{4} ]] || die "invalid one-time key length field encountered whilst decrypting"
     read -N "$length" eonetimekey || die "EOF reading one-time key field"
 
     # Decrypt it.  Use a herestring to avoid putting onetimekey in a
     # file or the arglist. Avoid exposing the value via
-    # shell-expansion, use read.
+    # shell-expansion - use read.  Note: read fails if genonetime
+    # returns no EOL.
     local onetimekey
     read -r onetimekey < <(rsadecrypt "$privkeyfile" <<<"$eonetimekey") || die "rsadecrypt failed"
 
-    # Decrypt the rest of the stream with it
-    # (actually openssl treats it as a password, so we can use base64)
+    # Decrypt the rest of the stream with it (we pass the key encoded
+    # as base64 directly, as a password).
     "$OPENSSL" enc -d $CYPHEROPT -pass fd:2 2<<<"$onetimekey" || die "failed to decrypt"
 }
 
@@ -238,7 +255,7 @@ while getopts "hedgvs:S:" OPTION
 do
     case "$OPTION" in
         h|d|e|g|v)
-	    [[ -z "$operation" ]] || die "can only use one of -e -d or -g"
+	    [[ -z "$operation" ]] || die "can only use one of -h, -e -d -g or -v"
 	    operation=$OPTION
             ;;
 
