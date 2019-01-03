@@ -128,11 +128,13 @@ function encrypt() {
     # Print the versioninfo, the encrypted key and their lengths (in
     # chars) first. We use a length to avoid permitting an arbitrarily
     # long read on decryption.
-    printf "%02d%s%04d%s" "${#versioninfo}" "$versioninfo" "${#eonetimekey}" "$eonetimekey"
+    printf "%02d%s%04d%s" "${#versioninfo}" "$versioninfo" "${#eonetimekey}" "$eonetimekey" ||
+	die "error formatting versioninfo field"
 
     # Encrypt stdin -> stdout using our one-time key, which is read from stderr
     # (actually openssl treats it as a password, so we can use base64)
-    "$OPENSSL" enc $CYPHEROPT -salt -pass fd:2 2<<<"$onetimekey"
+    "$OPENSSL" enc $CYPHEROPT -salt -pass fd:2 2<<<"$onetimekey" ||
+	die "failed to encrypt"
 }
 
 # decrypt $keyfile -  Hybrid-decrypts stdin to stdout.
