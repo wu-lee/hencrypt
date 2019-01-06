@@ -60,6 +60,18 @@ function setup {
     diff -q data/lorem tmp/lorem
 }
 
+@test "decrypt pre-encrypted data 1" {
+    run HENCRYPT_IO -d data/key1 data/enc1 tmp/dec
+    [ "$status" -eq 0 ]
+    diff -q data/lorem tmp/dec
+}
+
+@test "decrypt pre-encrypted data 2" {
+    run HENCRYPT_IO -d data/key2 data/enc2 tmp/dec
+    [ "$status" -eq 0 ]
+    diff -q data/lorem tmp/dec
+}
+
 @test "bad key encrypt failure" {
     # key1 is a bad encrypt key
     run HENCRYPT_IO -e data/key1 data/lorem tmp/enc
