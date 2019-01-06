@@ -19,7 +19,10 @@ RSAKEYSIZE=4096
 ONETIMEKEYSIZE=256
 OPENSSL=/usr/bin/openssl
 BASE64=/usr/bin/base64
-CYPHEROPT=-aes-256-cbc
+CYPHEROPT="-aes-256-cbc -md sha256"
+# Note, the -md option above is important, as the default changes
+# between openssl versions! (Specifically 1.0.2 -> 1.1.0)
+# See https://stackoverflow.com/questions/39637388
 
 # Write to stderr
 function warn() {
