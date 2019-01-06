@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Run this script to regenerate the test data when formats or somesuch
+# change.  Always visually check the results!
+
+../hencrypt -e data/key1.pub <data/lorem >data/enc1
+../hencrypt -e data/key2.pub <data/lorem >data/enc2
+
+# Change the version to an incompatible (smaller) one
+# Should work with all 0.x.y versions with x > 0 
+perl -pe 's/(\d+hencrypt 0\.)\d+\.\d+/${1}0.1/' <data/enc2 >data/enc.badversion
+
+# Change the version to a compatible one (same major/minor)
+# Should work with all 0.1.x versions with x < 9 (must beware of changing the length)
+perl -pe 's/(\d+hencrypt 0\.1\.)\d+/${1}9/' <data/enc2 >data/enc.goodversion
+
+# Stitch enc2's payload onto enc1's header. The size should be the same.
+head -c $((69+684+2+4)) data/enc1 >data/enc.stitched
+tail -c +$((69+684+2+4+1)) data/enc2 >>data/enc.stitched
+
+# Stitch most of enc1's payload onto enc1's header.  The result should be one byte shorter.
+head -c $((69+684+2+4)) data/enc1 >data/enc.truncated
+tail -c +$((69+684+2+4+1)) data/enc1 | head -c -1 >>data/enc.truncated
+
