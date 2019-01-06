@@ -46,7 +46,7 @@ function copyout() {
 # Versioning. IFS set to split on EOL temporarily to capture lines in arrays.
 IFS='
 '
-VERSION=0.1.0
+VERSION=0.1.1
 OPENSSL_VERSION=($("$OPENSSL" version -a)) || die "Failed to get openssl version"
 BASE64_VERSION=($("$BASE64" --version)) || die "Failed to get base64 version"
 unset IFS
