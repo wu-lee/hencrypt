@@ -32,11 +32,11 @@ function standard_usage {
 
 function loop_over_options {
     # Valid options, just incompatible
-    for opts in -{h,e,d,g}{h,e,d,g}; do
+    for opts in -{h,e,d,g,v}{h,e,d,g,v}; do
         run ../hencrypt $opts data/key1
-	#printf "%s %s\n" $opts "$output" >&3
+	#printf "debug: %s %s\n" $opts "$output" >&3
         [ "$status" -ne 0 ] || return 1
-        grep 'exiting: can only use one of -e -d or -g' <<<$output || return 1
+        grep 'exiting: can only use one of -h -e -d -g or -v' <<<$output || return 1
     done
     return 0
 }

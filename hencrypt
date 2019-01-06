@@ -255,7 +255,7 @@ while getopts "hedgvs:S:" OPTION
 do
     case "$OPTION" in
         h|d|e|g|v)
-	    [[ -z "$operation" ]] || die "can only use one of -h, -e -d -g or -v"
+	    [[ -z "$operation" ]] || die "can only use one of -h -e -d -g or -v"
 	    operation=$OPTION
             ;;
 
